@@ -1,0 +1,91 @@
+import time
+import json
+import datetime
+import uuid
+from pymodbus.constants import Endian
+from pymodbus.constants import Defaults
+from pymodbus.payload import BinaryPayloadDecoder
+from pymodbus.client.sync import ModbusSerialClient as ModbusClient
+from pymodbus.payload import BinaryPayloadBuilder
+from pymodbus.transaction import ModbusRtuFramer
+from paho.mqtt import client as mqtt_client
+
+global temprature
+global turbidity
+subscribed_topic = "MAX/SRP/SUB"  # Store the subscribed topic
+publish_topic ="MAX/SRP/PUB"
+
+# set Modbus defaults
+SERIAL = '/dev/ttyUSB0'
+BAUD = 9600
+Defaults.UnitId = 1
+Defaults.Retries = 5
+counter = 1
+client = ModbusClient(method='rtu', port=SERIAL, stopbits=1, bytesize=8, timeout=5, baudrate=BAUD, parity='N')
+connection = client.connect()
+print(bool(connection))
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        client.subscribe(subscribed_topic)  # Subscribe to a topic
+        global Connected
+        Connected = True
+        print(f"Subscribed to topic: {subscribed_topic}")  # Print the subscribed topic
+    else:
+        print("Connection failed")
+
+def on_message(client, userdata, msg):
+    print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")  # Print received data
+
+Connected = False
+
+# MQTT connection
+broker_address = "broker.emqx.io"
+port = 1883
+clientmqtt = mqtt_client.Client("srp/max")
+clientmqtt.on_connect = on_connect
+clientmqtt.on_message = on_message  # Set the on_message callback
+mqttstatus = clientmqtt.connect(broker_address, port)
+clientmqtt.loop_start()
+
+while Connected != True:
+    time.sleep(0.1)
+
+try:
+    while True:
+        temp = client.read_input_registers(address=2, count=2, unit=1)
+        temprature = BinaryPayloadDecoder.fromRegisters(temp.registers, Endian.Big, wordorder=Endian.Little)
+        temprature = temprature.decode_32bit_float()
+        time.sleep(1)
+        trub = client.read_input_registers(address=4, count=2, unit=1)
+        turbidity = BinaryPayloadDecoder.fromRegisters(trub.registers, Endian.Big, wordorder=Endian.Little)
+        turbidity = turbidity.decode_32bit_float()
+        time.sleep(1)
+        current_datetime = datetime.datetime.now()
+        current_datetime_str = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        print("Mac_id : " + str(uuid.getnode()) + " , Time:" + str(current_datetime_str) +
+              " , Temperature : " + str(round(temprature, 2)) + " , Turbidity : " + str(round(turbidity, 2))
+              )
+        data = {
+            'Macid': str(hex(uuid.getnode())),
+            'Time': str(current_datetime_str),
+            'parameter1': str(round(temprature,2)),
+            'parameter2': str(round(turbidity,2)),
+            'parameter3': "0",
+            'parameter4': "0",
+            'parameter5': "0"
+        }
+
+        # Create JSON data
+        sensor_json_data = json.dumps(data, indent=4)
+        print(sensor_json_data)
+
+        # MQTT data send
+        mqtt_data_send = clientmqtt.publish(publish_topic, sensor_json_data)
+        status = mqtt_data_send.rc
+        if status == mqtt_client.MQTT_ERR_SUCCESS:
+            print("Sent")
+        else:
+            print("Failed")
+except Exception as e:
+    print("Error:", str(e))

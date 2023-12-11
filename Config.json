@@ -1,0 +1,23 @@
+{
+    "Macid": "0xb4b024d2825e",
+    "Time": "2023-12-11 12:23:51.145756",
+    "Resid": 16,
+    "Typeid": 0,
+    "cal_1": "1",
+    "cal_2": "1",
+    "cal_3": "0.1188",
+    "cal_4": "1",
+    "Th_1": "100",
+    "Th_2": "9999",
+    "Th_3": "9999",
+    "Th_4": "9999",
+    "delay": "5",
+    "ssid": "bzg",
+    "pass": "hsu",
+    "Broker_id": "jitsi.maxelerator.org",
+    "Port_id": 1883,
+    "Config_topic": "NC/0xb4b024d2825e/WQM",
+    "Livedata_topic": "MAX/SRP/WQM",
+    "Res_topic": "MAX/SRP/WQM/CC",
+    "Alert_topic": "MAX/SRP/WQM/AC"
+}
